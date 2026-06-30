@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+<title>Dad's Emergency Vada Pav Locator</title>
+<meta name="description" content="Instantly find the nearest vada pav. Powered by terrible dad jokes." />
+
+<!-- ===================== PWA META TAGS ===================== -->
+<!-- This tells phones "this website can act like an app" -->
+<meta name="theme-color" content="#F7F3E9" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Vada Pav" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+
+<style>
+  /* =========================================================
+     DESIGN TOKENS
+     Off-white base, mustard yellow accent, warm brown ink.
+     One signature element: the "approval stamp" badge that
+     appears on the winning shop card, like an official seal
+     from "The Potato Council."
+     ========================================================= */
+  :root {
+    --bg: #F7F3E9;            /* warm off-white */
+    --card: #FFFFFF;          /* card surface, slightly lifted off bg */
+    --ink: #2B2118;           /* warm near-black for text */
+    --ink-soft: #6B5D4F;      /* muted brown for secondary text */
+    --mustard: #E0A526;       /* primary accent */
+    --mustard-deep: #B9831A;  /* pressed/active state */
+    --mustard-pale: #FBE9C4;  /* tint for backgrounds/badges */
+    --green-ok: #4C7A4A;      /* success accent, used sparingly */
+    --line: #EAE1CF;          /* hairline borders */
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+    --shadow: 0 8px 24px rgba(43, 33, 24, 0.08);
+    --shadow-press: 0 2px 8px rgba(43, 33, 24, 0.10);
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    /* Respect iPhone notch / home indicator */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 20px;
+  }
+
+  /* Respect reduced-motion preference everywhere */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  /* =========================================================
+     SCREEN MANAGEMENT
+     Only one screen is visible at a time. We just toggle
+     a "hidden" attribute — no fancy routing needed.
+     ========================================================= */
+  .screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    padding: 32px 0 24px;
+    animation: fadeIn 0.4s ease;
+  }
+  .screen[hidden] { display: none; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* =========================================================
+     SCREEN 1 — START
+     ========================================================= */
+  .start-screen { text-align: center; align-items: center; gap: 16px; }
+
+  .logo-mark {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 8px;
+  }
+
+  .app-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(2.1rem, 9vw, 2.6rem);
+    line-height: 1.08;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .app-title .accent { color: var(--mustard-deep); font-style: italic; }
+
+  .app-subtitle {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    margin: 0 0 8px;
+    max-width: 320px;
+    line-height: 1.5;
+  }
+
+  .btn {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 1.15rem;
+    border: none;
+    border-radius: 999px;
+    padding: 18px 32px;
+    cursor: pointer;
+    width: 100%;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--mustard);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .btn-primary:active { background: var(--mustard-deep); box-shadow: var(--shadow-press); }
+
+  .btn-secondary {
+    background: var(--card);
+    color: var(--ink);
+    border: 1.5px solid var(--line);
+  }
+  .btn-secondary:active { background: var(--mustard-pale); }
+
+  .btn-row { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 8px; }
+
+  .fine-print {
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+
+  /* =========================================================
+     SCREEN 2 — LOADING
+     ========================================================= */
+  .loading-screen { text-align: center; align-items: center; gap: 28px; }
+
+  .pav-spinner {
+    width: 88px;
+    height: 88px;
+    position: relative;
+  }
+  .pav-spinner svg {
+    width: 100%;
+    height: 100%;
+    animation: spin 1.4s linear infinite;
+    transform-origin: 50% 50%;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .pav-spinner svg { animation: none; }
+  }
+
+  .loading-message {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.35;
+    min-height: 4.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    transition: opacity 0.25s ease;
+  }
+
+  .loading-bar-track {
+    width: 100%;
+    max-width: 240px;
+    height: 6px;
+    background: var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .loading-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--mustard);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+
+  /* =========================================================
+     SCREEN 3 — RESULT
+     ========================================================= */
+  .result-screen { justify-content: flex-start; padding-top: 28px; gap: 16px; }
+
+  .result-eyebrow {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--mustard-deep);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0;
+    text-align: center;
+  }
+
+  /* The "Signature element": Potato Council approval stamp */
+  .winner-card {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    padding: 28px 24px 24px;
+    box-shadow: var(--shadow);
+    position: relative;
+    border: 2px solid var(--mustard);
+    overflow: hidden;
+  }
+
+  .stamp {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 76px;
+    height: 76px;
+    transform: rotate(8deg);
+    opacity: 0.95;
+  }
+
+  .winner-name {
+    font-family: var(--font-display);
+    font-size: 1.7rem;
+    font-weight: 600;
+    margin: 0 0 14px;
+    padding-right: 70px;
+    line-height: 1.2;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .stat-pill {
+    background: var(--mustard-pale);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    flex: 1;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: block;
+    line-height: 1.1;
+  }
+
+  .stat-label {
+    font-size: 0.74rem;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .winner-address {
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+    line-height: 1.4;
+  }
+
+  .directions-btn {
+    background: var(--ink);
+    color: var(--mustard-pale);
+    font-size: 1.1rem;
+  }
+  .directions-btn:active { background: #3D2F22; }
+  .directions-btn .arrow { margin-left: 6px; }
+
+  /* Runner-up list */
+  .also-nearby-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 8px 4px 2px;
+  }
+
+  .other-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .other-card {
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .other-card-name {
+    font-weight: 600;
+    font-size: 0.98rem;
+    margin: 0 0 2px;
+  }
+  .other-card-dist { font-size: 0.82rem; color: var(--ink-soft); margin: 0; }
+
+  .other-card-go {
+    background: var(--mustard-pale);
+    color: var(--ink);
+    border: none;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .other-card-go:active { background: var(--mustard); }
+
+  .retry-link {
+    text-align: center;
+    margin-top: 6px;
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 10px;
+    font-family: var(--font-body);
+  }
+
+  /* =========================================================
+     ERROR STATE
+     ========================================================= */
+  .error-screen { text-align: center; align-items: center; gap: 14px; }
+  .error-emoji { font-size: 3rem; line-height: 1; }
+  .error-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  .error-body {
+    color: var(--ink-soft);
+    font-size: 0.98rem;
+    line-height: 1.5;
+    max-width: 320px;
+    margin: 0;
+  }
+
+  /* =========================================================
+     FOOTER
+     ========================================================= */
+  .app-footer {
+    text-align: center;
+    padding: 4px 0 14px;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    opacity: 0.85;
+  }
+  .app-footer .heart { color: var(--mustard-deep); }
+
+  /* Visible keyboard focus for accessibility */
+  button:focus-visible {
+    outline: 3px solid var(--mustard-deep);
+    outline-offset: 2px;
+  }
+
+  /* Small phones */
+  @media (max-width: 360px) {
+    .app-title { font-size: 1.9rem; }
+    .winner-name { font-size: 1.45rem; padding-right: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ================= SCREEN 1: START ================= -->
+  <main class="screen start-screen" id="screen-start">
+    <svg class="logo-mark" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="48" cy="48" r="46" fill="#FBE9C4"/>
+      <ellipse cx="48" cy="58" rx="30" ry="14" fill="#E0A526"/>
+      <ellipse cx="48" cy="46" rx="26" ry="20" fill="#C97B3D"/>
+      <ellipse cx="48" cy="42" rx="20" ry="15" fill="#D99544"/>
+      <circle cx="40" cy="40" r="2.4" fill="#7A4A1E"/>
+      <circle cx="52" cy="44" r="2.2" fill="#7A4A1E"/>
+      <circle cx="46" cy="50" r="2" fill="#7A4A1E"/>
+      <circle cx="58" cy="38" r="1.8" fill="#7A4A1E"/>
+    </svg>
+
+    <h1 class="app-title">Dad's Emergency<br/><span class="accent">Vada Pav</span> Locator</h1>
+    <p class="app-subtitle">For when hunger strikes and only a potato can save you.</p>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-find">Find My Vada Pav</button>
+    </div>
+    <p class="fine-print">We'll ask for your location once. We promise to use it only for serious carb-related emergencies.</p>
+  </main>
+
+  <!-- ================= SCREEN 2: LOADING ================= -->
+  <main class="screen loading-screen" id="screen-loading" hidden>
+    <div class="pav-spinner" aria-hidden="true">
+      <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="44" cy="44" r="38" stroke="#EAE1CF" stroke-width="8"/>
+        <path d="M44 6 A38 38 0 0 1 82 44" stroke="#E0A526" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <p class="loading-message" id="loading-message" aria-live="polite">Vada you waiting for?</p>
+    <div class="loading-bar-track"><div class="loading-bar-fill" id="loading-bar"></div></div>
+  </main>
+
+  <!-- ================= SCREEN 3: RESULT ================= -->
+  <main class="screen result-screen" id="screen-result" hidden>
+    <p class="result-eyebrow">Official Verdict</p>
+
+    <div class="winner-card">
+      <svg class="stamp" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#B9831A" stroke-width="3" stroke-dasharray="4 3"/>
+        <circle cx="50" cy="50" r="36" fill="none" stroke="#B9831A" stroke-width="2"/>
+        <text x="50" y="40" text-anchor="middle" font-family="Georgia, serif" font-size="9" fill="#B9831A" font-weight="700">POTATO</text>
+        <text x="50" y="53" text-anchor="middle" font-family="Georgia, serif" font-size="9" fill="#B9831A" font-weight="700">COUNCIL</text>
+        <text x="50" y="66" text-anchor="middle" font-family="Georgia, serif" font-size="8" fill="#B9831A" font-style="italic">approved</text>
+      </svg>
+      <h2 class="winner-name" id="result-name">Loading shop name…</h2>
+
+      <div class="stat-row">
+        <div class="stat-pill">
+          <span class="stat-value" id="result-distance">–</span>
+          <span class="stat-label">Distance</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-value" id="result-time">–</span>
+          <span class="stat-label">Walk Time</span>
+        </div>
+      </div>
+
+      <p class="winner-address" id="result-address">Fetching address…</p>
+
+      <button class="btn directions-btn" id="btn-directions">Get Directions <span class="arrow">→</span></button>
+    </div>
+
+    <div id="others-wrap">
+      <p class="also-nearby-label">Also nearby</p>
+      <div class="other-list" id="other-list"></div>
+    </div>
+
+    <button class="retry-link" id="btn-retry">Search again</button>
+  </main>
+
+  <!-- ================= ERROR STATE ================= -->
+  <main class="screen error-screen" id="screen-error" hidden>
+    <div class="error-emoji">🥔</div>
+    <h2 class="error-title" id="error-title">We hit a roadblock.</h2>
+    <p class="error-body" id="error-body">Something went wrong while finding your vada pav.</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-error-retry">Try Again</button>
+    </div>
+  </main>
+
+  <footer class="app-footer">Made with love by Siya for Dad <span class="heart">❤️</span></footer>
+</div>
+
+<script src="jokes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
